@@ -30,16 +30,30 @@ A real-time collaborative whiteboard and shared textpad — <br>
 ## 🗂️ Project Structure
 
 ```plaintext
-/backend
-  ├── index.js          ← Express + Socket.io server
-  ├── .env              ← Supabase keys
-/frontend
-  ├── src
-      ├── App.jsx       ← Main app entry
-      ├── components/
-          ├── Toolbar.jsx
-          ├── RoomInfo.jsx
-  ├── index.css         ← Tailwind + custom styles
+root/
+├── backend/
+│   ├── index.js
+│   ├── package.json
+│   ├── .env.example
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   ├── vite.config.js
+│   ├── .env.example
+│   └── src/
+│       ├── index.js
+│       ├── index.css
+│       ├── App.jsx
+│       ├── pages/
+│       │   ├── HomePage.jsx
+│       │   ├── NotFoundPage.jsx
+│       │   └── RoomPage.jsx
+│       └── components/
+│           ├── Header.jsx
+│           ├── Whiteboard.jsx
+│           └── TextEditor.jsx
 ```
 ---
 
