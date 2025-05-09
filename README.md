@@ -34,14 +34,14 @@ root/
 ├── backend/
 │   ├── index.js
 │   ├── package.json
-│   ├── .env.example
+│   ├── .env
 ├── frontend/
 │   ├── index.html
 │   ├── package.json
 │   ├── postcss.config.js
 │   ├── tailwind.config.js
 │   ├── vite.config.js
-│   ├── .env.example
+│   ├── .env
 │   └── src/
 │       ├── index.js
 │       ├── index.css
