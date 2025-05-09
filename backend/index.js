@@ -5,6 +5,8 @@ const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 
+
+console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
 // Initialize Express app
 const app = express();
 app.use(cors());
