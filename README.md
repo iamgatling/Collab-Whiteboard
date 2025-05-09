@@ -34,16 +34,16 @@ root/
 ├── backend/
 │   ├── index.js
 │   ├── package.json
-│   ├── .env
+│   ├── .env(local test)
 ├── frontend/
 │   ├── index.html
 │   ├── package.json
 │   ├── postcss.config.js
 │   ├── tailwind.config.js
 │   ├── vite.config.js
-│   ├── .env
+│   ├── .env(local test)
 │   └── src/
-│       ├── index.js
+│       ├── index.jsx
 │       ├── index.css
 │       ├── App.jsx
 │       ├── pages/
