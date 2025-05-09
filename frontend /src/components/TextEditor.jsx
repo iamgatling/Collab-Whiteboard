@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function TextEditor({ socket, initialText = '', setLastUpdated }) {
   const [text, setText] = useState(initialText);
