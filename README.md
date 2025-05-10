@@ -204,18 +204,12 @@ Pull requests are welcome! Open issues or suggestions anytime.
 
 MIT License © 2025 iamgatling.
 
-
----
-
-### ❤️ Credits
-
-- [Fabric.js](http://fabricjs.com/)
-- [Supabase](https://supabase.com/)
-- [Socket.io](https://socket.io/)
-- [Tailwind CSS](https://tailwindcss.com/)
-
 ---
 
 ### 🏁 You're ready to collaborate!
 
 > Open http://localhost:3000/room/yourroomid in 2 tabs → draw & type together!
+
+Live version available at
+> Open
+https://wbcollab.vercel.app
