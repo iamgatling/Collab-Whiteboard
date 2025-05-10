@@ -211,5 +211,4 @@ MIT License © 2025 iamgatling.
 > Open http://localhost:3000/room/yourroomid in 2 tabs → draw & type together!
 
 Live version available at
-> Open
-https://wbcollab.vercel.app
+> https://wbcollab.vercel.app
