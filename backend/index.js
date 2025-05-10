@@ -1,24 +1,80 @@
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const { createClient } = require('@supabase/supabase-js');
+const cors = require('cors');
+
+console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const server = http.createServer(app);
+const io = new Server(server, { 
+  cors: { 
+    origin: process.env.FRONTEND_URL || '*',
+    methods: ['GET', 'POST'],
+    credentials: true
+  } 
+});
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('SUPABASE_URL and SUPABASE_KEY must be provided in .env');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const activeRooms = new Map();
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/rooms/:roomId', async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    
+    if (error) throw error;
+    
+    if (data) {
+      res.json({ 
+        roomId: data.id, 
+        canvasData: data.canvasData, 
+        textData: data.textData,
+        updatedAt: data.updated_at,
+        usersCount: activeRooms.get(roomId)?.size || 0
+      });
+    } else {
+      res.status(404).json({ error: 'Room not found' });
+    }
+  } catch (err) {
+    console.error('Error fetching room:', err);
+    res.status(500).json({ error: 'Failed to fetch room data' });
+  }
+});
 
 const ROOM_INACTIVITY_THRESHOLD = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL = 60 * 60 * 1000; 
 
-const activeRooms = new Map(); 
-
 function cleanupInactiveRooms() {
-  console.log('Running inactive room cleanup');
   const currentTime = Date.now();
   const roomsToCheck = [...activeRooms.keys()];
   
   roomsToCheck.forEach(async (roomId) => {
     const roomData = activeRooms.get(roomId);
-    
-    
     if (roomData.users.size === 0 && 
         (currentTime - roomData.lastActivity) > ROOM_INACTIVITY_THRESHOLD) {
-      console.log(`Deleting inactive room: ${roomId}`);
-      
       try {
-        
         const { error } = await supabase
           .from('rooms')
           .delete()
@@ -27,9 +83,7 @@ function cleanupInactiveRooms() {
         if (error) {
           console.error(`Error deleting room ${roomId}:`, error);
         } else {
-          
           activeRooms.delete(roomId);
-          console.log(`Room ${roomId} deleted successfully`);
         }
       } catch (err) {
         console.error(`Exception during room cleanup for ${roomId}:`, err);
@@ -38,37 +92,28 @@ function cleanupInactiveRooms() {
   });
 }
 
-
 function startCleanupInterval() {
   setInterval(cleanupInactiveRooms, CLEANUP_INTERVAL);
-  console.log(`Room cleanup service started, will run every ${CLEANUP_INTERVAL/1000/60} minutes`);
 }
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
   let currentRoomId = null;
   
-  // room join
   socket.on('join-room', async (roomId, callback) => {
     try {
-      // Leave previous room
       if (currentRoomId) {
         socket.leave(currentRoomId);
         const roomData = activeRooms.get(currentRoomId);
         if (roomData) {
           roomData.users.delete(socket.id);
           roomData.lastActivity = Date.now();
-          
-          // update user count
           io.to(currentRoomId).emit('users-count', roomData.users.size);
         }
       }
       
-      // Join new room
       currentRoomId = roomId;
       socket.join(roomId);
       
-      // Track users with timestamp
       if (!activeRooms.has(roomId)) {
         activeRooms.set(roomId, { 
           users: new Set(),
@@ -80,14 +125,12 @@ io.on('connection', (socket) => {
       roomData.users.add(socket.id);
       roomData.lastActivity = Date.now();
       
-      // Load room data 
       const { data, error } = await supabase
         .from('rooms')
         .select('*')
         .eq('id', roomId)
         .single();
       
-      // send data
       if (data) {
         socket.emit('load-initial', { 
           canvasData: data.canvasData, 
@@ -95,7 +138,6 @@ io.on('connection', (socket) => {
           updatedAt: data.updated_at
         });
       } else {
-        // Create new room
         const timestamp = new Date().toISOString();
         await supabase.from('rooms').insert({ 
           id: roomId, 
@@ -111,7 +153,6 @@ io.on('connection', (socket) => {
         });
       }
       
-      // shoe user count
       const usersCount = roomData.users.size;
       io.to(roomId).emit('users-count', usersCount);
       
@@ -122,21 +163,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  // drawing updates/activities 
   socket.on('drawing', async (canvasData) => {
     try {
       if (!currentRoomId) return;
-      
-      // last activity timestamp
       const roomData = activeRooms.get(currentRoomId);
       if (roomData) {
         roomData.lastActivity = Date.now();
       }
       
-      // show drawing 
       socket.to(currentRoomId).emit('drawing', canvasData);
       
-      // Save to supabase
       const timestamp = new Date().toISOString();
       await supabase
         .from('rooms')
@@ -150,21 +186,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  // text activities
   socket.on('text-update', async (textData) => {
     try {
       if (!currentRoomId) return;
-      
-      // last activity timestamp
       const roomData = activeRooms.get(currentRoomId);
       if (roomData) {
         roomData.lastActivity = Date.now();
       }
       
-      // show to users
       socket.to(currentRoomId).emit('text-update', textData);
       
-      // Save to supabase
       const timestamp = new Date().toISOString();
       await supabase
         .from('rooms')
@@ -178,18 +209,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  // autosave
   socket.on('periodic-save', async ({ canvasData, textData }) => {
     try {
       if (!currentRoomId) return;
-      
-      
       const roomData = activeRooms.get(currentRoomId);
       if (roomData) {
         roomData.lastActivity = Date.now();
       }
       
-      // Save to supabase
       const timestamp = new Date().toISOString();
       await supabase
         .from('rooms')
@@ -203,30 +230,23 @@ io.on('connection', (socket) => {
           if (error) {
             throw error;
           }
-          // confirm saving with time 
           socket.emit('save-confirmed', { timestamp });
         });
     } catch (err) {
       console.error('Error in periodic save:', err);
-      
       socket.emit('save-failed');
     }
   });
 
-  
   socket.on('clear-canvas', async () => {
     try {
       if (!currentRoomId) return;
-      
-      
       const roomData = activeRooms.get(currentRoomId);
       if (roomData) {
         roomData.lastActivity = Date.now();
       }
       
-      
       socket.to(currentRoomId).emit('clear-canvas');
-      
       
       const timestamp = new Date().toISOString();
       await supabase
@@ -241,28 +261,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
     if (currentRoomId) {
       const roomData = activeRooms.get(currentRoomId);
       if (roomData) {
         roomData.users.delete(socket.id);
         roomData.lastActivity = Date.now();
-        
-        
         if (roomData.users.size > 0) {
           io.to(currentRoomId).emit('users-count', roomData.users.size);
         }
-        
       }
     }
   });
 });
 
-
-server.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
+server.listen(process.env.PORT || 4000, () => {
+  console.log(`Backend running on port ${process.env.PORT || 4000}`);
   console.log(`Connected to Supabase at ${supabaseUrl}`);
   startCleanupInterval();
 });
