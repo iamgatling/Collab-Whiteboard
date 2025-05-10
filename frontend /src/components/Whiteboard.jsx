@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+// frontend/src/components/Whiteboard.jsx
+
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { fabric } from 'fabric';
 
 export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }) {
@@ -8,14 +10,23 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(3);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // 'success', 'error', or null
   const ignoreNextUpdateRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
+  const modifiedSinceLastSaveRef = useRef(false);
+  const initialLoadCompleteRef = useRef(false);
+  
+  // Auto-save interval in milliseconds
+  const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
   
   // Initialize canvas
   useEffect(() => {
     const canvas = new fabric.Canvas(canvasRef.current, {
       isDrawingMode: true,
       width: 800,
-      height: 600
+      height: 600,
+      backgroundColor: '#ffffff'
     });
     
     fabricRef.current = canvas;
@@ -25,22 +36,60 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     canvas.freeDrawingBrush.color = color;
     canvas.freeDrawingBrush.width = brushSize;
     
-    // Handle resize
+    // Handle resize - improved for better mobile experience
     const handleResize = () => {
       const container = canvas.getElement().parentElement;
+      
+      if (!container) return;
+      
+      // Make canvas responsive
       const width = container.clientWidth;
-      const height = Math.min(window.innerHeight - 200, 600);
+      
+      // For mobile, use more of the screen height
+      const isMobile = window.innerWidth < 768;
+      const height = isMobile 
+        ? Math.min(window.innerHeight - 150, 500) 
+        : Math.min(window.innerHeight - 200, 600);
       
       canvas.setDimensions({ width, height });
       canvas.renderAll();
     };
     
     window.addEventListener('resize', handleResize);
-    handleResize();
+    
+    // Initial resize
+    setTimeout(handleResize, 100); // Short delay to ensure container is ready
     
     return () => {
       window.removeEventListener('resize', handleResize);
+      clearInterval(autoSaveTimerRef.current);
       canvas.dispose();
+    };
+  }, []);
+
+  // Mobile touch event handling
+  useEffect(() => {
+    if (!fabricRef.current) return;
+
+    const handleTouchStart = () => {
+      // Prevent scrolling while drawing on mobile
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    };
+
+    const handleTouchEnd = () => {
+      // Re-enable scrolling
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+
+    const canvas = fabricRef.current.getElement();
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
   
@@ -62,6 +111,73 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     canvas.freeDrawingBrush.width = brushSize;
   }, [tool, color, brushSize]);
   
+  // Perform periodic auto-save
+  const performAutoSave = useCallback(() => {
+    if (!socket || !fabricRef.current) return;
+    
+    // Only save if there have been changes since last save
+    if (!modifiedSinceLastSaveRef.current && initialLoadCompleteRef.current) {
+      return;
+    }
+    
+    try {
+      const canvas = fabricRef.current;
+      const jsonData = canvas.toJSON();
+      
+      // Get text data from the parent component (we need to pass this down)
+      // For now, we'll use socket.io's callback to handle the success/failure
+      setIsSaving(true);
+      
+      // Emit save event with canvas data
+      socket.emit('periodic-save', { 
+        canvasData: jsonData,
+        textData: document.querySelector('textarea')?.value || '' // Get text from textarea
+      });
+      
+      modifiedSinceLastSaveRef.current = false;
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
+    }
+  }, [socket]);
+  
+  // Start auto-save timer
+  useEffect(() => {
+    if (!socket) return;
+    
+    // Clear any existing timer
+    if (autoSaveTimerRef.current) {
+      clearInterval(autoSaveTimerRef.current);
+    }
+    
+    // Set up auto-save timer
+    autoSaveTimerRef.current = setInterval(performAutoSave, AUTO_SAVE_INTERVAL);
+    
+    // Socket event listeners for save confirmation
+    const handleSaveConfirmed = ({ timestamp }) => {
+      setIsSaving(false);
+      setSaveStatus('success');
+      setLastUpdated && setLastUpdated(new Date(timestamp));
+      setTimeout(() => setSaveStatus(null), 3000);
+    };
+    
+    const handleSaveFailed = () => {
+      setIsSaving(false);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
+    };
+    
+    socket.on('save-confirmed', handleSaveConfirmed);
+    socket.on('save-failed', handleSaveFailed);
+    
+    return () => {
+      clearInterval(autoSaveTimerRef.current);
+      socket.off('save-confirmed', handleSaveConfirmed);
+      socket.off('save-failed', handleSaveFailed);
+    };
+  }, [socket, performAutoSave, setLastUpdated]);
+  
   // Handle socket events
   useEffect(() => {
     if (!socket || !fabricRef.current) return;
@@ -81,13 +197,23 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     const handleClearCanvas = () => {
       ignoreNextUpdateRef.current = true;
       canvas.clear();
+      canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
       canvas.renderAll();
       ignoreNextUpdateRef.current = false;
     };
     
     // Load initial canvas data
     if (initialCanvasData) {
-      canvas.loadFromJSON(initialCanvasData, canvas.renderAll.bind(canvas));
+      ignoreNextUpdateRef.current = true;
+      canvas.loadFromJSON(initialCanvasData, () => {
+        canvas.renderAll();
+        ignoreNextUpdateRef.current = false;
+        initialLoadCompleteRef.current = true;
+      });
+    } else {
+      // If no initial data, set background to white
+      canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+      initialLoadCompleteRef.current = true;
     }
     
     // Set up socket event listeners
@@ -98,6 +224,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     const handleCanvasModified = () => {
       if (ignoreNextUpdateRef.current) return;
       
+      modifiedSinceLastSaveRef.current = true;
       const jsonData = canvas.toJSON();
       socket.emit('drawing', jsonData);
       setLastUpdated && setLastUpdated(new Date());
@@ -119,12 +246,18 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     
     const canvas = fabricRef.current;
     canvas.clear();
+    canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+    modifiedSinceLastSaveRef.current = true;
     socket.emit('clear-canvas');
     setLastUpdated && setLastUpdated(new Date());
   };
   
   const handleToolChange = (newTool) => {
     setTool(newTool);
+  };
+  
+  const handleSaveNow = () => {
+    performAutoSave();
   };
   
   const handleDownload = () => {
@@ -146,7 +279,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
   
   return (
     <div className="flex flex-col space-y-4">
-      {/* Toolbar */}
+      {/* Toolbar - Enhanced for mobile with responsive design */}
       <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-lg shadow-sm">
         <div className="flex space-x-1">
           <button 
@@ -180,10 +313,10 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
           </button>
         </div>
         
-        <div className="w-px h-6 bg-gray-200 mx-2"></div>
+        <div className="w-px h-6 bg-gray-200 mx-2 hidden sm:block"></div>
         
         <div className="flex items-center space-x-2">
-          <label htmlFor="colorPicker" className="text-sm text-gray-600">Color:</label>
+          <label htmlFor="colorPicker" className="text-sm text-gray-600 hidden xs:inline">Color:</label>
           <input
             id="colorPicker"
             type="color"
@@ -194,7 +327,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
         </div>
         
         <div className="flex items-center space-x-2">
-          <label htmlFor="brushSize" className="text-sm text-gray-600">Size:</label>
+          <label htmlFor="brushSize" className="text-sm text-gray-600 hidden xs:inline">Size:</label>
           <input
             id="brushSize"
             type="range"
@@ -202,15 +335,57 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
             max="20"
             value={brushSize}
             onChange={(e) => setBrushSize(parseInt(e.target.value))}
-            className="w-24"
+            className="w-16 sm:w-24"
           />
-          <span className="text-sm text-gray-600">{brushSize}px</span>
+          <span className="text-sm text-gray-600 hidden sm:inline">{brushSize}px</span>
         </div>
         
-        <div className="ml-auto">
+        <div className="ml-auto flex space-x-2">
+          <button
+            onClick={handleSaveNow}
+            className={`py-1 px-2 sm:px-3 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center space-x-1
+              ${isSaving ? 'bg-gray-300 text-gray-600' : 'bg-green-600 text-white hover:bg-green-700'}
+              ${saveStatus === 'success' ? 'bg-green-500' : ''}
+              ${saveStatus === 'error' ? 'bg-red-500' : ''}
+            `}
+            disabled={isSaving}
+            title="Save Now"
+          >
+            {isSaving ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="hidden sm:inline">Saving</span>
+              </>
+            ) : saveStatus === 'success' ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="hidden sm:inline">Saved</span>
+              </>
+            ) : saveStatus === 'error' ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span className="hidden sm:inline">Failed</span>
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h1a2 2 0 012 2v7a2 2 0 01-2 2H8a2 2 0 01-2-2v-7a2 2 0 012-2h1v5.586l-1.293-1.293zM13 6a1 1 0 10-2 0v.586l1-1V6z" />
+                </svg>
+                <span className="hidden sm:inline">Save</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleDownload}
-            className="bg-blue-600 text-white py-1 px-3 text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="bg-blue-600 text-white py-1 px-2 sm:px-3 text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             title="Download as PNG"
           >
             Export
