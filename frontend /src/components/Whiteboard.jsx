@@ -1,4 +1,3 @@
-// frontend/src/components/Whiteboard.jsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { fabric } from 'fabric';
@@ -17,10 +16,9 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
   const modifiedSinceLastSaveRef = useRef(false);
   const initialLoadCompleteRef = useRef(false);
   
-  // Auto-save interval in milliseconds
+  // Auto-save interval
   const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
   
-  // Initialize canvas
   useEffect(() => {
     const canvas = new fabric.Canvas(canvasRef.current, {
       isDrawingMode: true,
@@ -31,21 +29,18 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     
     fabricRef.current = canvas;
     
-    // Set up default brush
+    // default brush
     canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
     canvas.freeDrawingBrush.color = color;
     canvas.freeDrawingBrush.width = brushSize;
     
-    // Handle resize - improved for better mobile experience
     const handleResize = () => {
       const container = canvas.getElement().parentElement;
       
       if (!container) return;
       
-      // Make canvas responsive
       const width = container.clientWidth;
       
-      // For mobile, use more of the screen height
       const isMobile = window.innerWidth < 768;
       const height = isMobile 
         ? Math.min(window.innerHeight - 150, 500) 
@@ -57,8 +52,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     
     window.addEventListener('resize', handleResize);
     
-    // Initial resize
-    setTimeout(handleResize, 100); // Short delay to ensure container is ready
+    setTimeout(handleResize, 100); 
     
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -72,7 +66,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     if (!fabricRef.current) return;
 
     const handleTouchStart = () => {
-      // Prevent scrolling while drawing on mobile
+      // Prevent scrolling on mobile
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
@@ -93,7 +87,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     };
   }, []);
   
-  // Set up tool and brush properties
+  // brush properties
   useEffect(() => {
     if (!fabricRef.current) return;
     
@@ -111,11 +105,11 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     canvas.freeDrawingBrush.width = brushSize;
   }, [tool, color, brushSize]);
   
-  // Perform periodic auto-save
+  // auto-save
   const performAutoSave = useCallback(() => {
     if (!socket || !fabricRef.current) return;
     
-    // Only save if there have been changes since last save
+    
     if (!modifiedSinceLastSaveRef.current && initialLoadCompleteRef.current) {
       return;
     }
@@ -124,11 +118,9 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
       const canvas = fabricRef.current;
       const jsonData = canvas.toJSON();
       
-      // Get text data from the parent component (we need to pass this down)
-      // For now, we'll use socket.io's callback to handle the success/failure
       setIsSaving(true);
       
-      // Emit save event with canvas data
+      
       socket.emit('periodic-save', { 
         canvasData: jsonData,
         textData: document.querySelector('textarea')?.value || '' // Get text from textarea
@@ -142,19 +134,19 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     }
   }, [socket]);
   
-  // Start auto-save timer
+  // auto-save timer
   useEffect(() => {
     if (!socket) return;
     
-    // Clear any existing timer
+    // remove existing timer
     if (autoSaveTimerRef.current) {
       clearInterval(autoSaveTimerRef.current);
     }
     
-    // Set up auto-save timer
+  
     autoSaveTimerRef.current = setInterval(performAutoSave, AUTO_SAVE_INTERVAL);
     
-    // Socket event listeners for save confirmation
+  
     const handleSaveConfirmed = ({ timestamp }) => {
       setIsSaving(false);
       setSaveStatus('success');
@@ -178,13 +170,13 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
     };
   }, [socket, performAutoSave, setLastUpdated]);
   
-  // Handle socket events
+  
   useEffect(() => {
     if (!socket || !fabricRef.current) return;
     
     const canvas = fabricRef.current;
     
-    // Update local canvas when receiving drawing from server
+    
     const handleReceivedDrawing = (canvasData) => {
       ignoreNextUpdateRef.current = true;
       canvas.loadFromJSON(canvasData, () => {
@@ -202,7 +194,7 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
       ignoreNextUpdateRef.current = false;
     };
     
-    // Load initial canvas data
+    // Load canvas data
     if (initialCanvasData) {
       ignoreNextUpdateRef.current = true;
       canvas.loadFromJSON(initialCanvasData, () => {
@@ -211,16 +203,16 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
         initialLoadCompleteRef.current = true;
       });
     } else {
-      // If no initial data, set background to white
+      
       canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
       initialLoadCompleteRef.current = true;
     }
     
-    // Set up socket event listeners
+    
     socket.on('drawing', handleReceivedDrawing);
     socket.on('clear-canvas', handleClearCanvas);
     
-    // Set up canvas event for sending updates
+    // sending updates for canvas
     const handleCanvasModified = () => {
       if (ignoreNextUpdateRef.current) return;
       
@@ -279,7 +271,6 @@ export default function Whiteboard({ socket, initialCanvasData, setLastUpdated }
   
   return (
     <div className="flex flex-col space-y-4">
-      {/* Toolbar - Enhanced for mobile with responsive design */}
       <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-lg shadow-sm">
         <div className="flex space-x-1">
           <button 
