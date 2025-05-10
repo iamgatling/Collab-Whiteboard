@@ -55,6 +55,7 @@ root/
 │           ├── Whiteboard.jsx
 │           └── TextEditor.jsx
 ```
+> + frontend/vercel.json (hosting to vercel allows room refreshing)
 ---
 
 ## 🖥️ How It Works
