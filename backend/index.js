@@ -4,8 +4,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
-const { supabase: supabaseClient, logToSupabase } = require('./supabase'); // Renamed supabase to supabaseClient for clarity
-const { handleSocketConnection, eventNames } = require('./events.js'); // Import handleSocketConnection and eventNames
+const { supabase: supabaseClient, logToSupabase } = require('./supabase'); 
+const { handleSocketConnection, eventNames } = require('./events.js'); 
 const roomManager = require('./roomManager');
 
 console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
@@ -116,31 +116,22 @@ app.get('/api/rooms/:roomId', async (req, res) => {
 });
 
 // TODO: Re-evaluate this cleanup logic. roomManager also has cleanup.
-// For now, we'll keep this Supabase-specific cleanup, but it should ideally be consolidated
-// or use roomManager's activity tracking.
+
 const ROOM_INACTIVITY_THRESHOLD = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL = 60 * 60 * 1000;
 
-// This function might need to be adapted if roomManager is the sole source of truth for room activity
-// and participant counts. For now, assuming it might run alongside roomManager's own cleanup.
+// might need to be adapted if roomManager is the sole source of truth for room activity and participant counts. 
 function cleanupInactiveSupabaseRooms() {
   console.log('Running cleanup for inactive Supabase rooms...');
-  // This logic needs re-evaluation. How do we get rooms to check from roomManager?
-  // Or does roomManager handle its own Supabase deletions?
-  // For now, this function is effectively disabled if activeRooms is removed.
-  // Let's assume roomManager's internal cleanup is sufficient for in-memory.
-  // Supabase cleanup might need a different trigger or data source.
-  // For the scope of this task, focusing on socket events and in-memory roomManager.
+  // This logic needs re-evaluation.
 }
 
 function startCleanupInterval() {
-  // Temporarily commenting out to avoid errors if activeRooms is fully removed
-  // setInterval(cleanupInactiveSupabaseRooms, CLEANUP_INTERVAL);
+  // Temporarily commenting out to avoid errors
   console.log('Supabase cleanup interval not started pending review of roomManager integration.');
 }
 
 io.on('connection', (socket) => {
-  // Pass supabaseClient (the initialized Supabase client) and logToSupabase to the handler
   handleSocketConnection(socket, io, roomManager, supabaseClient, logToSupabase);
 });
 
