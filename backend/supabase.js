@@ -22,41 +22,6 @@ if (supabaseUrl && supabaseAnonKey) {
   };
 }
 
-async function logToSupabase(logData) {
-  if (!supabase || typeof supabase.from !== 'function') {
-    console.error('Supabase client is not properly initialized. Cannot log to Supabase.', logData);
-    return;
-  }
-
-  const { type, roomId, userId, message, data } = logData;
-
-  const logEntry = {
-    type,
-    room_id: roomId,
-    user_id: userId,
-    message,
-    data,
-  };
-
- 
-  Object.keys(logEntry).forEach(key => {
-    if (logEntry[key] === undefined) {
-      delete logEntry[key];
-    }
-  });
-
-  try {
-    const { error } = await supabase.from('logs').insert([logEntry]);
-
-    if (error) {
-      console.error('Failed to log to Supabase:', error.message, logEntry);
-    }
-  } catch (err) {
-    console.error('Exception during Supabase log insertion:', err.message, logEntry);
-  }
-}
-
 module.exports = {
-  supabase, 
-  logToSupabase,
+  supabase,
 };

@@ -4,8 +4,9 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
-const { supabase: supabaseClient, logToSupabase } = require('./supabase'); 
-const { handleSocketConnection, eventNames } = require('./events.js'); 
+const { supabase: supabaseClient } = require('./supabase');
+const { logToSupabase } = require('./logger');
+const { handleSocketConnection, eventNames } = require('./events.js');
 const roomManager = require('./roomManager');
 
 console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
