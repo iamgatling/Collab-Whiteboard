@@ -1,5 +1,24 @@
+type UserRole = 'host' | 'editor' | 'viewer';
 
-function isUserHost(userId, roomId, roomManager) {
+interface Participant {
+  userName: string;
+  role: UserRole;
+  joinedAt: Date;
+}
+
+interface RoomManager {
+  getRoomHost(roomId: string): string | null;
+  getRoomParticipants(roomId: string): ({ userId: string } & Participant)[] | null;
+  isRoomLocked(roomId: string): boolean | null;
+}
+
+type PermissionCheckResult = {
+  allowed: boolean;
+  message?: string;
+  code?: string;
+};
+
+export function isUserHost(userId: string, roomId: string, roomManager: RoomManager): boolean {
   if (!roomId || !userId || !roomManager || typeof roomManager.getRoomHost !== 'function') {
     console.warn('isUserHost: Invalid parameters or roomManager missing getRoomHost.');
     return false;
@@ -7,7 +26,7 @@ function isUserHost(userId, roomId, roomManager) {
   return roomManager.getRoomHost(roomId) === userId;
 }
 
-function getUserRoleInRoom(userId, roomId, roomManager) {
+export function getUserRoleInRoom(userId: string, roomId: string, roomManager: RoomManager): UserRole | null {
   if (!roomId || !userId || !roomManager || typeof roomManager.getRoomParticipants !== 'function') {
     console.warn('getUserRoleInRoom: Invalid parameters or roomManager missing getRoomParticipants.');
     return null;
@@ -17,7 +36,7 @@ function getUserRoleInRoom(userId, roomId, roomManager) {
   return user ? user.role : null;
 }
 
-function canUserPerformEditAction(userId, userRole, roomId, roomManager) {
+export function canUserPerformEditAction(userId: string, userRole: UserRole, roomId: string, roomManager: RoomManager): PermissionCheckResult {
   if (!roomId || !userId || !userRole || !roomManager) {
     return { allowed: false, message: 'Invalid parameters for permission check.' };
   }
@@ -44,10 +63,3 @@ function canUserPerformEditAction(userId, userRole, roomId, roomManager) {
   
   return { allowed: true };
 }
-
-
-module.exports = {
-  isUserHost,
-  getUserRoleInRoom,
-  canUserPerformEditAction,
-};

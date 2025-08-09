@@ -1,28 +1,34 @@
-require('dotenv').config(); 
-
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL: SUPABASE_URL and SUPABASE_ANON_KEY must be provided in .env');
+  console.error('CRITICAL: SUPABASE_URL and SUPABASE_KEY must be provided in .env');
 }
 
 let supabase;
 if (supabaseUrl && supabaseAnonKey) {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
 } else {
-  console.error('Supabase client not initialized due to missing SUPABASE_URL or SUPABASE_ANON_KEY.');
+  console.error('Supabase client not initialized due to missing SUPABASE_URL or SUPABASE_KEY.');
  
   supabase = {
-    from: () => ({
+    from: (): any => ({
       insert: () => Promise.resolve({ error: { message: 'Supabase client not initialized' } })
     })
   };
 }
 
-async function logToSupabase(logData) {
+interface LogData {
+  type: string;
+  roomId?: string;
+  userId?: string;
+  message: string;
+  data?: any;
+}
+
+export async function logToSupabase(logData: LogData) {
   if (!supabase || typeof supabase.from !== 'function') {
     console.error('Supabase client is not properly initialized. Cannot log to Supabase.', logData);
     return;
@@ -55,8 +61,3 @@ async function logToSupabase(logData) {
     console.error('Exception during Supabase log insertion:', err.message, logEntry);
   }
 }
-
-module.exports = {
-  supabase, 
-  logToSupabase,
-};

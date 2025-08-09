@@ -1,27 +1,42 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const { createClient } = require('@supabase/supabase-js');
-const cors = require('cors');
-const { supabase: supabaseClient, logToSupabase } = require('./supabase'); 
-const { handleSocketConnection, eventNames } = require('./events.js'); 
-const roomManager = require('./roomManager');
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express, { Express, Request, Response } from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import { supabase } from './supabase';
+import { logToSupabase } from './logger';
+import { handleSocketConnection } from './events';
+import * as roomManager from './roomManager';
 
 console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
-const app = express();
-app.use(cors());
+const app: Express = express();
+
+const whitelist = [
+  (process.env.FRONTEND_URL || '').replace(/\/$/, ''),
+  'https://wbcollab.vercel.app'
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (whitelist.indexOf(origin!) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const server = http.createServer(app);
-const frontendUrl = (process.env.FRONTEND_URL || '*').replace(/\/$/, '');
 
 const io = new Server(server, { 
-  cors: { 
-    origin: frontendUrl,
-    methods: ['GET', 'POST'],
-    credentials: true
-  } 
+  cors: corsOptions
 });
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -32,7 +47,7 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -77,11 +92,11 @@ app.get('/', (req, res) => {
   `);
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/rooms/:roomId', async (req, res) => {
+app.get('/api/rooms/:roomId', async (req: Request, res: Response) => {
   try {
     const { roomId } = req.params;
     const { data, error } = await supabase
@@ -108,8 +123,8 @@ app.get('/api/rooms/:roomId', async (req, res) => {
     logToSupabase({
       type: 'ERROR',
       roomId: req.params.roomId,
-      message: `Error fetching room data for room ${req.params.roomId}. Error: ${err.message}`,
-      data: { error: err.stack, function: 'getRoomApi' }
+      message: `Error fetching room data for room ${req.params.roomId}. Error: ${(err as Error).message}`,
+      data: { error: (err as Error).stack, function: 'getRoomApi' }
     });
     res.status(500).json({ error: 'Failed to fetch room data' });
   }
@@ -132,7 +147,7 @@ function startCleanupInterval() {
 }
 
 io.on('connection', (socket) => {
-  handleSocketConnection(socket, io, roomManager, supabaseClient, logToSupabase);
+  handleSocketConnection(socket, io, roomManager, supabase, logToSupabase);
 });
 
 server.listen(process.env.PORT || 3001, () => {

@@ -1,34 +1,50 @@
+type RoomId = string;
+type UserId = string;
+type UserName = string;
+type Role = 'host' | 'editor' | 'viewer';
 
-const rooms = new Map(); 
-const userToRooms = new Map(); 
+interface Participant {
+  userName: UserName;
+  role: Role;
+  joinedAt: Date;
+}
 
-function addParticipant(roomId, userId, userName, role) {
+interface Room {
+  participants: Map<UserId, Participant>;
+  lastActivity: number;
+  isLocked: boolean;
+  hostId: UserId;
+}
+
+const rooms = new Map<RoomId, Room>();
+const userToRooms = new Map<UserId, Set<RoomId>>();
+
+export function addParticipant(roomId: RoomId, userId: UserId, userName: UserName, role: Role) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       participants: new Map(),
       lastActivity: Date.now(),
-      isLocked: false, 
-      hostId: userId, 
+      isLocked: false,
+      hostId: userId,
     });
   }
 
-  const room = rooms.get(roomId);
+  const room = rooms.get(roomId)!;
   room.participants.set(userId, { userName, role, joinedAt: new Date() });
   room.lastActivity = Date.now();
   if (role === 'host') {
-      room.hostId = userId;
+    room.hostId = userId;
   }
 
   if (!userToRooms.has(userId)) {
     userToRooms.set(userId, new Set());
   }
-  userToRooms.get(userId).add(roomId);
+  userToRooms.get(userId)!.add(roomId);
 
   console.log(`User ${userId} (${userName}, ${role}) added to room ${roomId}`);
-  
 }
 
-function removeParticipant(userId, roomId) {
+export function removeParticipant(userId: UserId, roomId: RoomId): boolean {
   const room = rooms.get(roomId);
   let removed = false;
   let wasHost = false;
@@ -44,20 +60,19 @@ function removeParticipant(userId, roomId) {
 
     if (room.participants.size === 0) {
       console.log(`Room ${roomId} is now empty. Deleting room.`);
-      rooms.delete(roomId); 
+      rooms.delete(roomId);
     } else if (wasHost) {
-      
-      const newHost = room.participants.keys().next().value; 
+      const newHost = room.participants.keys().next().value;
       if (newHost) {
-          const newHostDetails = room.participants.get(newHost);
-          if (newHostDetails) {
-            newHostDetails.role = 'host'; 
-            room.hostId = newHost;
-            console.log(`Host ${userId} left room ${roomId}. New host is ${newHost}.`);
-          }
+        const newHostDetails = room.participants.get(newHost);
+        if (newHostDetails) {
+          newHostDetails.role = 'host';
+          room.hostId = newHost;
+          console.log(`Host ${userId} left room ${roomId}. New host is ${newHost}.`);
+        }
       } else {
         console.log(`Room ${roomId} has participants but could not assign a new host.`);
-        rooms.delete(roomId); 
+        rooms.delete(roomId);
       }
     }
   }
@@ -70,11 +85,11 @@ function removeParticipant(userId, roomId) {
       console.log(`User ${userId} is no longer in any rooms.`);
     }
   }
- 
+
   return removed;
 }
 
-function getRoomParticipants(roomId) {
+export function getRoomParticipants(roomId: RoomId): ({ userId: UserId } & Participant)[] | null {
   const room = rooms.get(roomId);
   if (!room) {
     return null;
@@ -85,22 +100,21 @@ function getRoomParticipants(roomId) {
   }));
 }
 
-function getRoomsForUser(userId) {
+export function getRoomsForUser(userId: UserId): RoomId[] {
   const roomSet = userToRooms.get(userId);
   return roomSet ? Array.from(roomSet) : [];
 }
 
-
-function updateRoomActivity(roomId) {
-    if (rooms.has(roomId)) {
-        rooms.get(roomId).lastActivity = Date.now();
-    }
+export function updateRoomActivity(roomId: RoomId) {
+  if (rooms.has(roomId)) {
+    rooms.get(roomId)!.lastActivity = Date.now();
+  }
 }
 
 const INACTIVITY_THRESHOLD = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL = 60 * 60 * 1000;
 
-function cleanupInactiveRooms() {
+export function cleanupInactiveRooms() {
   const now = Date.now();
   console.log('Running cleanup for inactive rooms...');
   for (const [roomId, roomData] of rooms.entries()) {
@@ -119,17 +133,7 @@ function cleanupInactiveRooms() {
   }
 }
 
-
-module.exports = {
-  addParticipant,
-  removeParticipant,
-  getRoomParticipants,
-  getRoomsForUser,
-  updateRoomActivity,
-};
-
-
-function toggleRoomLock(roomId, currentHostId) {
+export function toggleRoomLock(roomId: RoomId, currentHostId: UserId): { success: boolean; message?: string; isLocked?: boolean } {
   const room = rooms.get(roomId);
   if (!room) {
     return { success: false, message: 'Room not found.' };
@@ -143,23 +147,23 @@ function toggleRoomLock(roomId, currentHostId) {
   return { success: true, isLocked: room.isLocked };
 }
 
-function isRoomLocked(roomId) {
-  const room = rooms.get(roomId);
-  if (!room) {
-    return null; 
-  }
-  return room.isLocked;
-}
-
-function getRoomHost(roomId) {
+export function isRoomLocked(roomId: RoomId): boolean | null {
   const room = rooms.get(roomId);
   if (!room) {
     return null;
   }
-  return room.hostId || null; 
+  return room.isLocked;
 }
 
-function transferHost(roomId, currentHostId, newHostId) {
+export function getRoomHost(roomId: RoomId): UserId | null {
+  const room = rooms.get(roomId);
+  if (!room) {
+    return null;
+  }
+  return room.hostId || null;
+}
+
+export function transferHost(roomId: RoomId, currentHostId: UserId, newHostId: UserId): { success: boolean; message?: string } {
   const room = rooms.get(roomId);
   if (!room) {
     return { success: false, message: 'Room not found.' };
@@ -190,7 +194,7 @@ function transferHost(roomId, currentHostId, newHostId) {
   return { success: true };
 }
 
-function removeAllParticipants(roomId) {
+export function removeAllParticipants(roomId: RoomId): { success: boolean; message?: string } {
   const room = rooms.get(roomId);
   if (!room) {
     return { success: false, message: 'Room not found.' };
@@ -210,16 +214,3 @@ function removeAllParticipants(roomId) {
   console.log(`All participants removed and session ended for room ${roomId}.`);
   return { success: true };
 }
-
-module.exports = {
-  addParticipant,
-  removeParticipant,
-  getRoomParticipants,
-  getRoomsForUser,
-  updateRoomActivity,
-  toggleRoomLock,
-  isRoomLocked,
-  getRoomHost,
-  transferHost,
-  removeAllParticipants,
-};
