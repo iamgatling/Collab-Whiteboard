@@ -1,18 +1,26 @@
 import { Server, Socket } from 'socket.io';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { RoomManager } from '../roomManager';
-import { logToSupabase } from '../logger';
+import { LogToSupabaseFn } from '../logger';
 import { eventNames } from '../events';
 import * as utils from '../utils';
 
 interface State {
-  currentRoomId: string | null;
+  currentRoomId?: string;
   currentUserId: string;
   currentUserName: string;
   currentUserRole: 'host' | 'editor' | 'viewer';
 }
 
-export default (io: Server, socket: Socket, roomManager: RoomManager, supabase: SupabaseClient, logToSupabase: typeof logToSupabase, state: State) => async () => {
+
+export default (
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  supabase: SupabaseClient,
+  logToSupabase: LogToSupabaseFn, 
+  state: State
+) => async () => {
   try {
     if (!state.currentRoomId) return;
 

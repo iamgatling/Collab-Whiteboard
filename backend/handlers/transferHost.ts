@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { RoomManager } from '../roomManager';
-import { logToSupabase } from '../logger';
+import { logToSupabase as logToSupabaseFn } from '../logger';
 import { eventNames } from '../events';
 import * as utils from '../utils';
 
@@ -12,7 +12,7 @@ interface State {
   currentUserRole: 'host' | 'editor' | 'viewer';
 }
 
-export default (io: Server, socket: Socket, roomManager: RoomManager, supabase: SupabaseClient, logToSupabase: typeof logToSupabase, state: State) => (data: { newHostId: string }, callback: (response: { success: boolean, error?: string }) => void) => {
+export default (io: Server, socket: Socket, roomManager: RoomManager, supabase: SupabaseClient, logToSupabase: typeof logToSupabaseFn, state: State) => (data: { newHostId: string }, callback: (response: { success: boolean, error?: string }) => void) => {
   const { newHostId } = data;
   if (!state.currentRoomId || !newHostId) {
     if (callback) callback({ success: false, error: 'Missing room or new host ID.' });

@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { RoomManager } from '../roomManager';
-import { logToSupabase } from '../logger';
+import { LogToSupabaseFn } from '../logger';
 import { eventNames } from '../events';
 import * as utils from '../utils';
 
@@ -12,7 +12,14 @@ interface State {
   currentUserRole: 'host' | 'editor' | 'viewer';
 }
 
-export default (io: Server, socket: Socket, roomManager: RoomManager, supabase: SupabaseClient, logToSupabase: typeof logToSupabase, state: State) => async (data: { roomId: string, userName: string, role: 'host' | 'editor' | 'viewer' }, callback: (response: { success: boolean, error?: string, code?: string, participants?: any[] }) => void) => {
+export default (
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  supabase: SupabaseClient,
+  logToSupabase: LogToSupabaseFn, // ✅ use the type here
+  state: State
+)  => async (data: { roomId: string, userName: string, role: 'host' | 'editor' | 'viewer' }, callback: (response: { success: boolean, error?: string, code?: string, participants?: any[] }) => void) => {
   console.log(`[SERVER] Socket ${socket.id} sent ${eventNames.JOIN_ROOM} with data:`, data);
   const { roomId, userName, role } = data;
   try {

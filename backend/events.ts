@@ -1,7 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { RoomManager } from './roomManager';
-import { logToSupabase } from './logger';
+import { LogToSupabaseFn } from './logger';
+import { State } from './types';
 import joinRoomHandler from './handlers/joinRoom';
 import sendMessageHandler from './handlers/sendMessage';
 import getRoomParticipantsHandler from './handlers/getRoomParticipants';
@@ -45,28 +46,34 @@ export const eventNames = {
   ROOM_JOINED_SUCCESSFULLY: 'room-joined-successfully',
   BRUSH_UPDATE: 'brush-update',
   LOAD_CANVAS_HISTORY: 'load_canvas_history',
+} as const;
+
+
+const state: State = {
+  currentRoomId: null,
+  currentUserId: socket.id,
+  currentUserName: `User_${socket.id.substring(0, 5)}`,
+  currentUserRole: 'viewer',
 };
 
-interface State {
-  currentRoomId: string | null;
-  currentUserId: string;
-  currentUserName: string;
-  currentUserRole: 'host' | 'editor' | 'viewer';
-}
 
-export function handleSocketConnection(socket: Socket, io: Server, roomManager: RoomManager, supabase: SupabaseClient, logToSupabase: typeof logToSupabase) {
-  const state: State = {
-    currentRoomId: null,
-    currentUserId: socket.id,
-    currentUserName: `User_${socket.id.substring(0, 5)}`,
-    currentUserRole: 'viewer',
-  };
+export function handleSocketConnection(
+  socket: Socket,
+  io: Server,
+  roomManager: RoomManager,
+  supabase: SupabaseClient,
+  logToSupabase: LogToSupabaseFn,
+  state: State
+) {
 
-  console.log(`[SERVER] New socket trying to connect, ID: ${socket.id}, Query: ${JSON.stringify(socket.handshake.query)}`);
+  console.log(
+    `[SERVER] New socket trying to connect, ID: ${socket.id}, Query: ${JSON.stringify(socket.handshake.query)}`
+  );
+
   logToSupabase({
     type: 'USER_CONNECTED_SOCKET',
     userId: state.currentUserId,
-    message: `User socket ${state.currentUserId} connected to server.`
+    message: `User socket ${state.currentUserId} connected to server.`,
   });
 
   socket.on(eventNames.JOIN_ROOM, joinRoomHandler(io, socket, roomManager, supabase, logToSupabase, state));

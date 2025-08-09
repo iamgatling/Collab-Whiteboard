@@ -19,6 +19,21 @@ interface Room {
 const rooms = new Map<RoomId, Room>();
 const userToRooms = new Map<UserId, Set<RoomId>>();
 
+export interface RoomManager {
+  addParticipant: typeof addParticipant;
+  removeParticipant: typeof removeParticipant;
+  getRoomParticipants: typeof getRoomParticipants;
+  getRoomsForUser: typeof getRoomsForUser;
+  updateRoomActivity: typeof updateRoomActivity;
+  cleanupInactiveRooms: typeof cleanupInactiveRooms;
+  toggleRoomLock: typeof toggleRoomLock;
+  isRoomLocked: typeof isRoomLocked;
+  getRoomHost: typeof getRoomHost;
+  transferHost: typeof transferHost;
+  removeAllParticipants: typeof removeAllParticipants;
+}
+
+
 export function addParticipant(roomId: RoomId, userId: UserId, userName: UserName, role: Role) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {

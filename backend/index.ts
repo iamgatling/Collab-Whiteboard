@@ -48,48 +48,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 app.get('/', (req: Request, res: Response) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Backend Landing Page</title>
-      <style>
-        body {
-          background: #282c34;
-          color: #61dafb;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
-          text-align: center;
-        }
-        h1 {
-          font-size: 3rem;
-          margin-bottom: 0.5rem;
-        }
-        p {
-          font-size: 1.5rem;
-          color: #21d07a;
-        }
-        small {
-          margin-top: 2rem;
-          color: #888;
-        }
-      </style>
-    </head>
-    <body>
-      <h1>Backend is running!</h1>
-      <p>Socket.IO + Supabase </p>
-      <p>ACTIVE🤩</p>
-      <small>All systems green.</small>
-    </body>
-    </html>
-  `);
+  res.send(`Good`);
 });
 
 app.get('/api/health', (req: Request, res: Response) => {
