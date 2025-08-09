@@ -120,15 +120,6 @@ function cleanupInactiveRooms() {
 }
 
 
-module.exports = {
-  addParticipant,
-  removeParticipant,
-  getRoomParticipants,
-  getRoomsForUser,
-  updateRoomActivity,
-};
-
-
 function toggleRoomLock(roomId, currentHostId) {
   const room = rooms.get(roomId);
   if (!room) {
