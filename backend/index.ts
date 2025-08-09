@@ -4,24 +4,38 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
-const { supabase: supabaseClient, logToSupabase } = require('./supabase'); 
-const { handleSocketConnection, eventNames } = require('./events.js'); 
+const { supabase: supabaseClient } = require('./supabase');
+const { logToSupabase } = require('./logger');
+const { handleSocketConnection, eventNames } = require('./events.js');
 const roomManager = require('./roomManager');
 
 console.log('Allowed frontend URL:', process.env.FRONTEND_URL);
 const app = express();
-app.use(cors());
+
+const whitelist = [
+  (process.env.FRONTEND_URL || '').replace(/\/$/, ''),
+  'https://wbcollab.vercel.app'
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (whitelist.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const server = http.createServer(app);
-const frontendUrl = (process.env.FRONTEND_URL || '*').replace(/\/$/, '');
 
 const io = new Server(server, { 
-  cors: { 
-    origin: frontendUrl,
-    methods: ['GET', 'POST'],
-    credentials: true
-  } 
+  cors: corsOptions
 });
 
 const supabaseUrl = process.env.SUPABASE_URL;
